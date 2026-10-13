@@ -5,7 +5,6 @@ import { applyExplicitChatReasoningWirePolicy } from "./openai-chat/reasoning-wi
 import type { AdapterRequest, IncomingMeta, ProviderAdapter } from "./base";
 import type { AdapterEvent, OcxParsedRequest, OcxProviderConfig, OcxUsage } from "../types";
 import { modelInList } from "../types";
-import { createInlineThinkContentSplitter } from "./inline-think-tags";
 import { mapReasoningEffort } from "../reasoning-effort";
 import { debugProviderDiagnostic } from "../lib/debug";
 import { sseFieldValue } from "../lib/sse-decoder";
@@ -28,7 +27,7 @@ import {
   type InvalidToolCallDiagnostic,
 } from "./openai-chat/tool-call-validation";
 import {
-  chatContentEvents, splitChatContentEvents,
+  chatContentEvents, createChatContentSplitter, splitChatContentEvents,
   createReasoningDetailSnapshotTracker,
   invalidChoicesEvent,
   invalidToolCallsEvent,
@@ -369,7 +368,7 @@ export function createOpenAIChatAdapter(provider: OcxProviderConfig): ProviderAd
       const reasoningDetailsOptIn = modelInList(provider.reasoningDetailsModels, lastRequestedModelId ?? "");
       // A gateway with no server-side reasoning parser leaves thinking inline in `content` as
       // <think> blocks, which would otherwise render as the answer. Passthrough unless opted in.
-      const inlineThink = createInlineThinkContentSplitter(provider.inlineThinkTagModels, lastRequestedModelId, budget);
+      const inlineThink = createChatContentSplitter(provider, lastRequestedModelId, budget);
       const emitContent = function* (events: AdapterEvent[]): Generator<AdapterEvent> {
         for (const event of events) {
           // Any other event keeps its place behind held text instead of overtaking it.
@@ -447,7 +446,7 @@ export function createOpenAIChatAdapter(provider: OcxProviderConfig): ProviderAd
           }
           for (const event of chatContentEvents(delta.content, provider.baseUrl, pendingUsage)) {
             if (event.type === "error") return yield* terminateWithError(event);
-            yield* event.type === "text_delta" ? emitContent(inlineThink.feed(event.text)) : toolCallContent.hold(event);
+            yield* emitContent(inlineThink.feed(event));
           }
 
           const rawToolCalls = delta.tool_calls;

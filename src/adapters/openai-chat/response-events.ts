@@ -47,13 +47,30 @@ export function chatContentEvents(content: unknown, baseUrl: string, usage?: Ocx
   return events;
 }
 
-/** Use one splitter for the whole buffered answer, including adjacent typed text blocks. */
+/** Keep adjacent text together; typed reasoning flushes and resets inline-tag parsing. */
+export function createChatContentSplitter(provider: OcxProviderConfig, modelId: string | undefined, budget: TranslatorBudget) {
+  let splitter = createInlineThinkContentSplitter(provider.inlineThinkTagModels, modelId, budget);
+  return {
+    feed(event: ChatContentEvent): AdapterEvent[] {
+      if (event.type === "error") return [event];
+      if (event.type === "text_delta") return splitter.feed(event.text);
+      const pending = splitter.flush();
+      splitter.dispose();
+      splitter = createInlineThinkContentSplitter(provider.inlineThinkTagModels, modelId, budget);
+      return [...pending, event];
+    },
+    flush: () => splitter.flush(),
+    dispose: () => splitter.dispose(),
+  };
+}
+
+/** Split a buffered answer with the same typed-reasoning boundaries as a stream. */
 export function splitChatContentEvents(content: unknown, provider: OcxProviderConfig, modelId: string | undefined, budget: TranslatorBudget, usage?: OcxUsage): AdapterEvent[] {
   const events = chatContentEvents(content, provider.baseUrl, usage, true);
   if (events.some(event => event.type === "error")) return events;
-  const splitter = createInlineThinkContentSplitter(provider.inlineThinkTagModels, modelId, budget);
+  const splitter = createChatContentSplitter(provider, modelId, budget);
   try {
-    return [...events.flatMap(event => event.type === "text_delta" ? splitter.feed(event.text) : [event]), ...splitter.flush()];
+    return [...events.flatMap(event => splitter.feed(event)), ...splitter.flush()];
   } finally {
     splitter.dispose();
   }

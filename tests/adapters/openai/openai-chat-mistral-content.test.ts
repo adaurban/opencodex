@@ -143,6 +143,38 @@ describe("Mistral typed response content", () => {
     expect(joined(events, "text_delta")).toBe("answer");
   });
 
+  for (const mode of ["stream", "buffered"] as const) {
+    test.each([
+      { name: "partial opening tag", content: [text("<thi"), thinking("typed"), text("nk>answer</think>")],
+        answer: "<think>answer</think>", reasoning: "typed",
+        leading: { type: "text_delta", text: "<thi" }, trailing: "nk>answer</think>" },
+      { name: "open thinking block", content: [text("<think>before"), thinking("typed"), text("answer")],
+        answer: "answer", reasoning: "beforetyped",
+        leading: { type: "reasoning_raw_delta", text: "before" }, trailing: "answer" },
+    ])(`${mode}: typed reasoning ends inline-tag parsing ($name)`, async ({ content, answer, reasoning, leading, trailing }) => {
+      const provider = createOpenAIChatAdapter({ adapter: "openai-chat", baseUrl: BASE_URL, inlineThinkTagModels: [MODEL] });
+      await provider.buildRequest(parseRequest({ model: MODEL, input: "fixture" }));
+      const budget = createTestTranslatorBudget();
+      const events: AdapterEvent[] = mode === "buffered"
+        ? await provider.parseResponse!(Response.json(responsePayload(content)), budget)
+        : [];
+      if (mode === "stream") {
+        // Separate deltas also test carry ownership across SSE chunks.
+        const chunks = content.map(block => ({ choices: [{ delta: { content: [block] } }] }));
+        for await (const event of provider.parseStream(streamResponse([...chunks, terminal]), budget)) events.push(event);
+      }
+      expect(joined(events, "text_delta")).toBe(answer);
+      expect(joined(events, "reasoning_raw_delta")).toBe(reasoning);
+      expect(events.filter(event => event.type !== "done")).toEqual([
+        leading,
+        { type: "reasoning_raw_delta", text: "typed" },
+        { type: "text_delta", text: trailing },
+      ]);
+      for (const event of events) releaseTranslatedEvent(event, budget);
+      expect(budget.snapshot()).toMatchObject({ currentBytes: 0, activeCalls: 0 });
+    });
+  }
+
   test("typed reasoning and a tool call cross Responses continuation", async () => {
     const events = await collect([
       { choices: [{ delta: { content: [thinking("Inspect the file."), text("Checking.")],
