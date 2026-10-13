@@ -1,6 +1,7 @@
 import { diagnoseInvalidToolCalls, isRecord, type InvalidToolCallDiagnostic } from "./tool-call-validation";
 import { TranslatorBudgetExceededError, type TranslatorBudget } from "../../lib/translator-budget";
-import type { AdapterEvent, OcxUsage } from "../../types";
+import type { AdapterEvent, OcxProviderConfig, OcxUsage } from "../../types";
+import { createInlineThinkContentSplitter } from "../inline-think-tags";
 
 export function stopReasonFor(finishReason: unknown): "max_tokens" | "content_filter" | undefined {
   return finishReason === "length"
@@ -16,6 +17,46 @@ export function reasoningTextFrom(record: Record<string, unknown>): string | und
     : typeof record.reasoning === "string" && record.reasoning.length > 0
       ? record.reasoning
       : undefined;
+}
+
+type ChatContentEvent = Extract<AdapterEvent, { type: "text_delta" | "reasoning_raw_delta" | "error" }>;
+
+/** Mistral can mix typed blocks and strings in one response. Other destinations keep their parser. */
+export function chatContentEvents(content: unknown, baseUrl: string, usage?: OcxUsage, buffered = false): ChatContentEvent[] {
+  if (typeof content === "string") return content.length > 0 || buffered ? [{ type: "text_delta", text: content }] : [];
+  if (!Array.isArray(content)) return [];
+  let host: string;
+  try { host = new URL(baseUrl).hostname; } catch { return []; }
+  if (host !== "api.mistral.ai") return [];
+  const invalid = (): ChatContentEvent[] => [{
+    type: "error", status: 502, errorType: "upstream_error",
+    message: "unsupported Mistral content block", ...(usage ? { usage } : {}),
+  }];
+  const events: ChatContentEvent[] = [];
+  for (const block of content) {
+    if (!isRecord(block)) return invalid();
+    if (block.type === "text" && typeof block.text === "string") {
+      if (block.text.length > 0 || buffered) events.push({ type: "text_delta", text: block.text });
+    } else if (block.type === "thinking" && Array.isArray(block.thinking)) {
+      for (const inner of block.thinking) {
+        if (!isRecord(inner) || inner.type !== "text" || typeof inner.text !== "string") return invalid();
+        if (inner.text.length > 0) events.push({ type: "reasoning_raw_delta", text: inner.text });
+      }
+    } else return invalid();
+  }
+  return events;
+}
+
+/** Use one splitter for the whole buffered answer, including adjacent typed text blocks. */
+export function splitChatContentEvents(content: unknown, provider: OcxProviderConfig, modelId: string | undefined, budget: TranslatorBudget, usage?: OcxUsage): AdapterEvent[] {
+  const events = chatContentEvents(content, provider.baseUrl, usage, true);
+  if (events.some(event => event.type === "error")) return events;
+  const splitter = createInlineThinkContentSplitter(provider.inlineThinkTagModels, modelId, budget);
+  try {
+    return [...events.flatMap(event => event.type === "text_delta" ? splitter.feed(event.text) : [event]), ...splitter.flush()];
+  } finally {
+    splitter.dispose();
+  }
 }
 
 export interface ReasoningDetailSegment {
