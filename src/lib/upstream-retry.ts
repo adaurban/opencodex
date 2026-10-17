@@ -31,11 +31,13 @@ import { redactSecretString } from "./redact";
 const nonReplayableResponses = new WeakSet<Response>();
 const nonReplayableRetryAfter = new WeakMap<Response, string>();
 
+/** Prevent another send and retain an optional server delay on this response. */
 export function markResponseNonReplayable(response: Response, retryAfter?: string): void {
   nonReplayableResponses.add(response);
   if (retryAfter !== undefined) nonReplayableRetryAfter.set(response, retryAfter);
 }
 
+/** Return the server delay retained for a response that must not be replayed. */
 export function nonReplayableRetryAfterFor(response: Response): string | undefined {
   return nonReplayableRetryAfter.get(response);
 }

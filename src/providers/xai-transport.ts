@@ -122,8 +122,7 @@ export function resolveProviderTransport(
   if (providerName === "github-copilot") {
     return resolveGithubCopilotTransport(provider, apiBaseUrl);
   }
-  if (providerName === "mistral") return resolveMistralTransport(provider);
-  if (providerName !== "xai") return provider;
+  if (providerName !== "xai") return resolveMistralTransport(provider);
 
   const cacheKey = promptCacheKey?.trim();
   const affinity = cacheKey ? deriveXaiConvId(cacheKey) : undefined;

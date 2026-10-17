@@ -12,7 +12,10 @@ const DEFAULT_MAX_WAIT_MS = 60_000; // Existing retry wait budget, not an inferr
 const MINUTE_MS = 60 * 1000; // Unit named by the observed headers, never an account quota.
 type RecoveryState = { generation: number; probe?: { done: Promise<void>; finish(): void } };
 
-export function isCanonicalMistralChat(provider: OcxProviderConfig): boolean {
+/** Match the supported key-auth Chat destination, including one optional trailing slash. */
+export function isCanonicalMistralChat(
+  provider: Pick<OcxProviderConfig, "adapter" | "authMode" | "baseUrl">,
+): boolean {
   if (provider.adapter !== "openai-chat" || (provider.authMode !== undefined && provider.authMode !== "key")) return false;
   try {
     const url = new URL(provider.baseUrl);
@@ -21,6 +24,7 @@ export function isCanonicalMistralChat(provider: OcxProviderConfig): boolean {
   } catch { return false; }
 }
 
+/** Read a nonnegative integer counter; reject missing or malformed values. */
 function count(headers: Headers, name: string): number | undefined {
   const raw = headers.get(name)?.trim();
   if (!raw || !/^\d+$/.test(raw)) return undefined;
@@ -28,6 +32,7 @@ function count(headers: Headers, name: string): number | undefined {
   return Number.isSafeInteger(value) ? value : undefined;
 }
 
+/** Read the server delay as seconds or an HTTP date; ignore invalid hints. */
 function retryDelay(headers: Headers, now: number): number | undefined {
   const raw = headers.get("retry-after")?.trim();
   if (!raw) return undefined;
@@ -61,6 +66,7 @@ export class MistralBudgetPacer {
     private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void> = sleepWithAbort,
   ) {}
 
+  /** Record server delays and confirmed minute pressure for this credential and model. */
   observe(identity: string, headers: Headers, status = 200): void {
     const tokens = count(headers, "x-ratelimit-remaining-tokens-minute");
     const requests = count(headers, "x-ratelimit-remaining-req-minute");
@@ -90,6 +96,7 @@ export class MistralBudgetPacer {
     }
   }
 
+  /** Wait within the admission budget and return a release callback for one recovery probe. */
   async acquire(identity: string, signal?: AbortSignal, maxWaitMs = DEFAULT_MAX_WAIT_MS): Promise<(success?: boolean) => void> {
     signal?.throwIfAborted();
     if (this.waiting >= MAX_IDENTITIES) throw new RequestPacingQueueOverloadError("mistral", "queue_full", 60);
@@ -143,6 +150,7 @@ export class MistralBudgetPacer {
 const pacer = new MistralBudgetPacer();
 const wrapped = new WeakSet<typeof globalThis.fetch>();
 
+/** Wrap canonical Mistral Chat sends with bounded admission and server-delay protection. */
 export function resolveMistralTransport(
   provider: OcxProviderTransport,
   budgetPacer = pacer,

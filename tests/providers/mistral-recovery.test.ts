@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { createOpenAIChatAdapter } from "../../src/adapters/openai-chat";
 import { providerConfigSeed } from "../../src/providers/derive";
 import { rateLimitRetryPolicyFor } from "../../src/providers/key-failover";
-import { MistralBudgetPacer, mistralMinuteRefusal, resolveMistralTransport } from "../../src/providers/mistral-transport";
+import { isCanonicalMistralChat, MistralBudgetPacer, mistralMinuteRefusal, resolveMistralTransport } from "../../src/providers/mistral-transport";
 import { isNonReplayableResponse, sleepWithAbort } from "../../src/lib/upstream-retry";
 import { resolveProviderTransport } from "../../src/providers/xai-transport";
 import { PROVIDER_REGISTRY } from "../../src/providers/registry";
@@ -29,7 +29,10 @@ afterEach(() => {
 
 describe("Mistral recovery defaults", () => {
   test.each([baseUrl, `${baseUrl}/`, "https://API.MISTRAL.AI:443/v1"])("canonical key destination %s waits on 429", url => {
-    expect(rateLimitRetryPolicyFor({ ...provider, baseUrl: url })).toEqual(policy);
+    const row = { ...provider, baseUrl: url };
+    expect(rateLimitRetryPolicyFor(row)).toEqual(policy);
+    expect(isCanonicalMistralChat(row)).toBe(true);
+    expect(resolveMistralTransport(row)).not.toBe(row);
   });
 
   test("explicit settings and opt-out remain authoritative", () => {
@@ -49,9 +52,13 @@ describe("Mistral recovery defaults", () => {
     "https://api.openai.com/v1", "https://api.mistral.ai.example.test/v1",
     "https://example.test/api.mistral.ai/v1", "http://api.mistral.ai/v1",
     "https://api.mistral.ai:8443/v1", `${baseUrl}?route=custom`, `${baseUrl}#custom`,
-    "https://api.mistral.ai/other/v1",
+    "https://api.mistral.ai/other/v1", `${baseUrl}//`,
+    baseUrl.replace("://", "://synthetic-user:synthetic-password@"), "not a URL",
   ])("other destinations retain fail-fast behavior: %s", url => {
-    expect(rateLimitRetryPolicyFor({ ...provider, baseUrl: url })).toBeNull();
+    const row = { ...provider, baseUrl: url };
+    expect(rateLimitRetryPolicyFor(row)).toBeNull();
+    expect(isCanonicalMistralChat(row)).toBe(false);
+    expect(resolveMistralTransport(row)).toBe(row);
   });
 
   test("a non-Chat adapter at the same host retains its previous behavior", () => {
@@ -72,7 +79,7 @@ describe("Mistral recovery defaults", () => {
 });
 
 describe("Mistral Responses recovery", () => {
-  async function dispatch(options: { failures: number; stream?: boolean; disabled?: boolean; abort?: AbortController; retryAfter?: string; leased?: boolean; minuteBudget?: boolean }) {
+  async function dispatch(options: { failures: number; stream?: boolean; disabled?: boolean; abort?: AbortController; retryAfter?: string; leased?: boolean; minuteBudget?: boolean; providerName?: string; maxIntervalMs?: number }) {
     const bodies: string[] = [];
     const authorizations: (string | null)[] = [];
     const apiKey = `synthetic-mistral-key-${++dispatchId}`;
@@ -96,17 +103,18 @@ describe("Mistral Responses recovery", () => {
     releaseSpendHome = acquireOwnedSpendHome();
     let now = 0;
     const waits: number[] = [];
-    const row = { ...provider, apiKey, ...(options.disabled ? { retryOn429: { enabled: false } } : {}),
+    const providerName = options.providerName ?? "mistral";
+    const row = { ...provider, apiKey, ...(options.maxIntervalMs === undefined ? {} : { retryOn429: { maxIntervalMs: options.maxIntervalMs } }), ...(options.disabled ? { retryOn429: { enabled: false } } : {}),
       ...(options.leased ? { requestPacing: { enabled: true, maxConcurrentRequests: 1 } } : {}) };
     const transport = options.minuteBudget ? resolveMistralTransport({ ...row, fetch: globalThis.fetch,
       retryOn429: { intervalMs: 0 } }, new MistralBudgetPacer(() => now, async (ms, signal) => {
       signal?.throwIfAborted(); waits.push(ms); now += ms;
     })) : row;
-    const config = { port: 0, defaultProvider: "mistral", providers: { mistral: transport } } as OcxConfig;
+    const config = { port: 0, defaultProvider: providerName, providers: { [providerName]: transport } } as OcxConfig;
     const response = await handleResponses(new Request("http://localhost/v1/responses", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: `mistral/${model}`, input: "Synthetic fixture", stream: options.stream ?? false, prompt_cache_key: "synthetic-conversation" }),
-    }), config, { model: `mistral/${model}`, provider: "mistral" }, { abortSignal: options.abort?.signal });
+      body: JSON.stringify({ model: `${providerName}/${model}`, input: "Synthetic fixture", stream: options.stream ?? false, prompt_cache_key: "synthetic-conversation" }),
+    }), config, { model: `${providerName}/${model}`, provider: providerName }, { abortSignal: options.abort?.signal });
     return { response, bodies, authorizations, apiKey, waits };
   }
 
@@ -135,6 +143,14 @@ describe("Mistral Responses recovery", () => {
     expect(bodies[1]).toBe(bodies[0]);
     expect(JSON.parse(bodies[0]!).prompt_cache_key).toBe("synthetic-conversation");
     expect(waits).toEqual([60000]);
+  });
+
+  test("a custom-named Mistral provider returns long server delays without early replay", async () => {
+    const { response, bodies } = await dispatch({ failures: 1, providerName: "mistral-vibe", retryAfter: "120", maxIntervalMs: 1, leased: true });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("120");
+    expect(bodies).toHaveLength(1);
+    await response.text();
   });
 
   test("explicit opt-out surfaces the first 429", async () => {
@@ -248,7 +264,7 @@ describe("Mistral observed budget pacing", () => {
     await transport.fetch!(`${baseUrl}/chat/completions`, init);
     await transport.fetch!(`${baseUrl}/chat/completions`, init);
     expect(waits).toEqual([]);
-    expect(resolveProviderTransport("another-provider", { ...provider, fetch }).fetch).toBe(fetch);
+    expect(resolveProviderTransport("another-provider", { ...provider, fetch, baseUrl: "https://example.test/v1" }).fetch).toBe(fetch);
     expect(resolveMistralTransport({ ...provider, fetch, baseUrl: "https://example.test/v1" }).fetch).toBe(fetch);
     expect(resolveMistralTransport(transport)).toBe(transport);
   });

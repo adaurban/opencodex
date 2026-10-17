@@ -12,6 +12,7 @@ import { isKeyInCooldown, getKeyCooldownUntil, setKeyCooldown } from "./api-key-
 export { clearKeyCooldowns, getKeyCooldownUntil, sweepExpiredApiKeyCooldowns } from "./api-key-cooldowns";
 import { commitProviderApiKeySelection, providerApiKeySelectionIsCurrent } from "./api-key-selection";
 import { RequestPacingQueueOverloadError } from "./request-pacing";
+import { isCanonicalMistralChat } from "./mistral-transport";
 import type { ProviderApiKeySelection } from "../types/provider";
 import { routedProviderConfig } from "./routed-config";
 import { getProviderRegistryEntry } from "./registry";
@@ -613,8 +614,9 @@ export function rateLimitRetryPolicyFor(
   if (provider.authMode !== undefined && provider.authMode !== "key") return null;
   // Mistral's token-throughput and temporary capacity refusals both use HTTP 429.
   // Keep relays and other wire adapters opt-in, and reuse the existing send budget.
-  if (provider.adapter === "openai-chat" && typeof provider.baseUrl === "string"
-    && normalizedBaseUrl(provider.baseUrl.trim()) === "https://api.mistral.ai/v1") {
+  if (typeof provider.baseUrl === "string" && typeof provider.adapter === "string" && isCanonicalMistralChat({
+    adapter: provider.adapter, authMode: provider.authMode, baseUrl: provider.baseUrl,
+  })) {
     return { ...DEFAULT_RATE_LIMIT_RETRY, attempts: 6, intervalMs: 10_000 };
   }
   if (isOpenCodeGoDestination(provider)) return { ...OPENCODE_GO_RATE_LIMIT_RETRY };
