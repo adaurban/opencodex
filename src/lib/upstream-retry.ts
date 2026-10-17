@@ -29,9 +29,15 @@ import { redactSecretString } from "./redact";
  * marker that survives body re-wrapping (combo failure consumption re-parses the JSON).
  */
 const nonReplayableResponses = new WeakSet<Response>();
+const nonReplayableRetryAfter = new WeakMap<Response, string>();
 
-export function markResponseNonReplayable(response: Response): void {
+export function markResponseNonReplayable(response: Response, retryAfter?: string): void {
   nonReplayableResponses.add(response);
+  if (retryAfter !== undefined) nonReplayableRetryAfter.set(response, retryAfter);
+}
+
+export function nonReplayableRetryAfterFor(response: Response): string | undefined {
+  return nonReplayableRetryAfter.get(response);
 }
 
 export function isNonReplayableResponse(response: Response): boolean {
@@ -144,6 +150,8 @@ export function retainReplayRefusal<T extends Response>(response: T): T {
 
 /** Carry the verdict from a response onto the one that replaces it. */
 export function carryReplayRefusal<T extends Response>(source: Response, rewrapped: T): T {
+  const retryAfter = nonReplayableRetryAfterFor(source);
+  if (retryAfter !== undefined) markResponseNonReplayable(rewrapped, retryAfter);
   return isReplayRefusalResponse(source) ? retainReplayRefusal(rewrapped) : rewrapped;
 }
 

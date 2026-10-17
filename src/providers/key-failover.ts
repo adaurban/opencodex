@@ -585,7 +585,7 @@ function allocateDistributedKey(providerName: string, provider: OcxProviderConfi
  * (subscription traffic such as Muse Spark) falls back to a patient same-key policy so a
  * burst 429 waits and replays instead of surfacing to the client and aborting a long
  * session; key-auth Command Code at its canonical endpoints gets the same fallback (#5180), and
- * every other provider without the knob keeps today's fail-fast behavior.
+ * canonical Mistral Chat uses a slower fallback; other destinations stay fail-fast.
  * OAuth/forward/local credentials are never replayed on the same token. The returned
  * policy is fully defaulted so callers never re-check fields.
  */
@@ -609,8 +609,14 @@ export function rateLimitRetryPolicyFor(
       respectRetryAfter: policy.respectRetryAfter ?? DEFAULT_RATE_LIMIT_RETRY.respectRetryAfter,
     };
   }
-  // No explicit knob: patient fallback for OpenCode Go and canonical Command Code only.
+  // No explicit knob: destination-specific fallbacks, never OAuth or local credentials.
   if (provider.authMode !== undefined && provider.authMode !== "key") return null;
+  // Mistral's token-throughput and temporary capacity refusals both use HTTP 429.
+  // Keep relays and other wire adapters opt-in, and reuse the existing send budget.
+  if (provider.adapter === "openai-chat" && typeof provider.baseUrl === "string"
+    && normalizedBaseUrl(provider.baseUrl.trim()) === "https://api.mistral.ai/v1") {
+    return { ...DEFAULT_RATE_LIMIT_RETRY, attempts: 6, intervalMs: 10_000 };
+  }
   if (isOpenCodeGoDestination(provider)) return { ...OPENCODE_GO_RATE_LIMIT_RETRY };
   // Command Code's Provider API rate-limits long muse-spark turns the same way (#5180): a single
   // key cannot fail over, and the Codex client does not retry a 429, so the turn aborts. The key
