@@ -138,7 +138,8 @@ tokens while fitting the full advertised allowance. This is a local recovery pol
 exact server-reset prediction. Healthy traffic never predicts the next query's cache or cost.
 After the wait, one recovery probe runs; success restores ordinary traffic. Missing, malformed,
 zero-entitlement, exhausted-monthly, or above-full-allowance evidence does not invent a reset or compact history.
-`requestPacing: { "enabled": false }` disables shared pacing. If Mistral's
+`requestPacing: { "enabled": false }` or `retryOn429: { "respectRetryAfter": false }`
+disables shared pacing. If Mistral's
 retry time exceeds `retryOn429.maxIntervalMs`, the proxy returns the 429 and retry hint rather
 than replaying early. Context windows and per-model compaction preferences remain independent.
 
