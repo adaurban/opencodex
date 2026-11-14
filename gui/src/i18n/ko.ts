@@ -17,6 +17,14 @@ import type { TKey } from "./en";
  * Korean i18n catalog; must match the `TKey` set (compile-checked).
  */
 export const ko: Record<TKey, string> = {
+  "pws.helpers.description": "Provider helpers are saved with this provider. Native mode uses Mistral only; an unavailable helper never falls back to GPT.",
+  "pws.helpers.search": "Web search helper",
+  "pws.helpers.vision": "Image helper",
+  "pws.helpers.inherit": "Use global setting",
+  "pws.helpers.native": "Use Mistral",
+  "pws.helpers.disabled": "Disabled",
+  "pws.helpers.searchModel": "Mistral search model",
+  "pws.helpers.visionModel": "Mistral image model",
     "pws.firstResponse.title": "첫 응답 진행 상태",
   "pws.firstResponse.stepProvider": "제공자",
   "pws.firstResponse.stepModels": "모델",

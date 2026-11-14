@@ -1,3 +1,4 @@
+import { runMistralWebSearch } from "./mistral-executor";
 import { bindAnthropicRejectionResponse } from "../adapters/anthropic-rejection-memo";
 import { anthropicDeclaredTools } from "../adapters/anthropic-tool-catalog";
 import { enableAnthropicReplayCapture, takeAnthropicReplay, bindAnthropicReplay, type AnthropicReplaySnapshot } from "../adapters/anthropic-replay";
@@ -369,7 +370,7 @@ export interface WebSearchLoopDeps {
    * (audit F4). The widened ids (xai/gemini/exa) cannot reach the loop yet: planWebSearch returns
    * no plan for them (inert 060 arms), and the dispatch below only branches on "anthropic".
    */
-  backend?: WebSearchBackendId;
+  backend?: WebSearchBackendId | "mistral";
   /** Required for the openai backend; unused (and typically undefined) for the anthropic backend. */
   forwardProvider?: OcxProviderConfig;
   /** Required for the anthropic backend: the stored-OAuth provider that runs web_search_20250305. */
@@ -381,6 +382,7 @@ export interface WebSearchLoopDeps {
   geminiSidecar?: { providerName: string; provider: OcxProviderConfig };
   /** Required for the exa backend: the operator key, read from config at plan unpack (L9). */
   exaApiKey?: string;
+  mistralSidecar?: { providerName: string; provider: OcxProviderConfig; config: OcxConfig };
   /** Opt-in x_search options for the xai backend. */
   xaiSearchOptions?: XaiSearchOptions;
   hostedTool: Record<string, unknown>;
@@ -1042,6 +1044,10 @@ export async function runWithWebSearch(deps: WebSearchLoopDeps): Promise<Respons
             outcome = deps.geminiSidecar
               ? await runGeminiWebSearch(query, deps.geminiSidecar.providerName, deps.geminiSidecar.provider, settings, signal)
               : { text: "", sources: [], error: "gemini backend selected without a resolved Antigravity provider" };
+          } else if (backend === "mistral") {
+            outcome = deps.mistralSidecar
+              ? await runMistralWebSearch(query, deps.mistralSidecar, settings, signal, deps.dispatchSidecarSend)
+              : { text: "", sources: [], error: "native Mistral search provider is unavailable" };
           } else if (backend === "exa") {
             // L9: non-LLM lane; key comes from the loop deps, never the plan. Fail closed.
             outcome = deps.exaApiKey

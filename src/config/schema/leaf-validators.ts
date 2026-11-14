@@ -1,3 +1,4 @@
+import { providerHelpersConfigError } from "../../sidecar/provider-policy";
 import * as z from "zod/v4";
 import { EXPORT_CLIENT_IDS } from "../../clients/client-ids";
 import { accountAutoPausePolicySchema, accountPauseDetailsSchema } from "./account-auto-pause";
@@ -468,6 +469,8 @@ export const providerConfigSchema = z.object({
   xaiResponsesDefaultVersion: z.number().int().positive().optional().catch(undefined),
   zaiResponsesDefaultVersion: z.number().int().positive().optional().catch(undefined),
 }).passthrough().superRefine((provider, ctx) => {
+  const helperError = providerHelpersConfigError(provider.helpers, provider as OcxProviderConfig);
+  if (helperError) ctx.addIssue({ code: "custom", path: ["helpers"], message: helperError });
   if (provider.projectContext !== undefined && provider.adapter !== "command-code") {
     ctx.addIssue({ code: "custom", path: ["projectContext"], message: "projectContext is supported only by the command-code adapter" });
   }

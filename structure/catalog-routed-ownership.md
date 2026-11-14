@@ -1,6 +1,6 @@
 # Routed-row authorship and combo descriptions
 
-Catalog maintenance has to tell rows OpenCodex generated from rows Codex, Cursor or the user put
+Catalog maintenance has to tell rows OpenCodex generated from rows Codex, Cursor or the user put The image-description attachment overlay in `src/codex/catalog/model-hints.ts` honors a provider-native helper choice even when the global vision helper is disabled; an explicit provider disable suppresses that overlay.
 there: removal of a deleted provider's or combo's rows, baseline-shadow restoration, native
 template selection, auto-review routed detection, exact-combo admission and native-residue
 detection all ask that question. Historically every generated routed row answered it through its

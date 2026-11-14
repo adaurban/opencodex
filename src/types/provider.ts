@@ -1062,6 +1062,8 @@ export interface OcxProviderConfig {
    * mid-work; non-`openai-chat` adapters ignore this flag.
    */
   terminalContinuationGuard?: boolean;
+  /** Per-provider helper policy; omission preserves the global settings. */
+  helpers?: import("./provider-helpers").ProviderHelpers;
   /**
    * Opt-in for OpenAI-compatible chat gateways that may close after emitting a complete
    * tool-call delta without `finish_reason` or `[DONE]`. The adapter accepts that EOF only

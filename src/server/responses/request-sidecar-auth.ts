@@ -62,8 +62,8 @@ export async function prepareResponsesSidecarAuth(
   // credential for them too. The passthrough bridge stays fetch-only.
   const needsOpenAiSearch = !routedCompaction
     && (transportState.adapter.runTurn
-      ? shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough)
-      : (shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough)
+      ? shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough, route.provider)
+      : (shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough, route.provider)
         || shouldResolveOpenAiPassthroughWebSearchBridge(route.provider, parsed, isPassthrough)));
   if (needsOpenAiVision || needsOpenAiSearch) {
     try {

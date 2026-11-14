@@ -264,7 +264,9 @@ export function withVisionSidecarInput(
   provider: OcxProviderConfig | undefined,
   enabled = true,
 ): CatalogModel {
-  if (!enabled || !provider || !isModelVisionSidecarConsumer(provider, model.id)) return model;
+  const policy = provider?.helpers?.vision;
+  if (policy === "disabled") return model;
+  if ((policy !== "native" && !enabled) || !provider || !isModelVisionSidecarConsumer(provider, model.id)) return model;
   const modalities = model.inputModalities ?? ["text"];
   return modalities.includes("image") ? model
     : copyReasoningHintSource(model, { ...model, inputModalities: [...modalities, "image"] });

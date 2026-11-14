@@ -318,6 +318,26 @@ describe("Mistral GLM vision sidecar defaults", () => {
     if (mode === "disabled" || mode.startsWith("retired-")) expect(forwarded).toContain("[image omitted:");
   }, 60_000);
 
+  test("provider-native image helper survives reload and uses Mistral with no GPT provider", async () => {
+    const config = configuration();
+    delete config.providers.openai;
+    config.visionSidecar = { enabled: false, backend: "openai" };
+    config.providers.mistral!.helpers = { vision: "native", visionModel: NATIVE, search: "disabled" };
+    saveConfig(config);
+    const loaded = loadConfig();
+    expect(loaded.providers.mistral!.helpers?.vision).toBe("native");
+    proxy = startServer(0);
+    const response = await imageRequest(`mistral/${GLM}`);
+    expect(response.status).toBe(200);
+    expect(sidecarCalls).toHaveLength(0);
+    expect(mainCalls).toHaveLength(2);
+    expect(mainCalls[0]!.model).toBe(NATIVE);
+    expect(JSON.stringify(mainCalls[0])).toContain(IMAGE);
+    expect(mainCalls[1]!.model).toBe(GLM);
+    expect(JSON.stringify(mainCalls[1])).not.toContain(IMAGE);
+    expect(JSON.stringify(mainCalls[1])).toContain("A red square.");
+  }, 60_000);
+
   test("fixture retains its fetch mock until an in-flight request and server have finished", async () => {
     let release!: () => void;
     sidecarWait = new Promise<void>(resolve => { release = resolve; });

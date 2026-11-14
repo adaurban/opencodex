@@ -1958,3 +1958,19 @@ from the tool-call cache for those turns. Preserve their supplied reasoning for 
 See [Account auto-pause](/reference/configuration/account-auto-pause/) for configuration, qualifying refusals, and recovery.
 
 For a custom Ark Kimi Responses provider, set `arkKimiResponsesModels` to an array of exact upstream model or endpoint IDs that reject encrypted-output includes and orphan reasoning replay. It is unset by default; use the upstream ID, not the display alias.
+
+
+## Provider helper policy
+
+The optional `providers.<name>.helpers` object selects helpers for that provider. Missing settings or `"inherit"` retain global behavior. `"disabled"` disables the helper. For a key-auth Mistral Chat provider at the canonical Mistral API endpoint, `"native"` uses Mistral only and never falls back to GPT. Existing installations are not automatically migrated. The provider Settings tab saves these choices with the other provider fields.
+
+```json
+"helpers": {
+  "search": "native",
+  "searchModel": "mistral-vibe-cli-with-tools",
+  "vision": "native",
+  "visionModel": "mistral-medium-latest"
+}
+```
+
+Model names above are examples, not account entitlement guarantees. Choose available models and verify access before enabling them. Both names are bare model IDs from the same provider. Native search sends the query to `/v1/conversations` with `web_search` and `store: false`; the primary model continues using Chat Completions. Search must return evidence of tool execution, assistant text and HTTP citations; missing evidence or HTTP failures become failed search results. No search engine vendor is assumed. Responses API migration is not required. Image-capable main models still receive images directly; text-only main models use the existing routed image describer with the selected same-provider model. Captioning can lose detail. A missing or unusable native describer fails rather than borrowing a GPT helper.

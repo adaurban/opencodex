@@ -1,3 +1,4 @@
+import { providerHelpersConfigError } from "../sidecar/provider-policy";
 import type { OcxConfig, OcxParsedRequest, OcxProviderConfig } from "../types";
 import { modelInList, toolChoiceToolPredicate } from "../types";
 import { requiresVisionPreprocessing } from "../vision";
@@ -104,7 +105,8 @@ export function webSearchStallTimeoutSec(
 
 export interface SidecarPlan {
   /** Which executor runs the search. Anthropic does not require a forward provider. */
-  backend: WebSearchBackendId;
+  backend: WebSearchBackendId | "mistral";
+  mistralSidecar?: { providerName: string; provider: OcxProviderConfig; config: OcxConfig };
   /** Present for the openai backend (ChatGPT forward path); undefined for anthropic. */
   forwardSidecar?: ResolvedOpenAiForwardSidecar;
   /** Present for the anthropic backend (stored-OAuth /v1/messages path); undefined for openai. */
@@ -132,7 +134,9 @@ export function shouldResolveOpenAiWebSearchSidecar(
   config: OcxConfig,
   parsed: OcxParsedRequest,
   isPassthrough: boolean,
+  provider?: OcxProviderConfig,
 ): boolean {
+  if (provider?.helpers?.search === "native" || provider?.helpers?.search === "disabled") return false;
   if (!parsed._webSearch || isPassthrough) return false;
   if (!toolChoiceToolPredicate(parsed.options.toolChoice)(buildWebSearchTool())) return false;
   const cfg = config.webSearchSidecar ?? {};
@@ -160,6 +164,27 @@ export function planWebSearch(
 ): SidecarPlan | undefined {
   if (!parsed._webSearch || isPassthrough) return undefined;
   if (!toolChoiceToolPredicate(parsed.options.toolChoice)(buildWebSearchTool())) return undefined;
+  const choice = provider.helpers?.search;
+  if (choice === "disabled") return undefined;
+  if (choice === "native") {
+    const error = providerHelpersConfigError(provider.helpers, provider);
+    if (error) throw new Error(error);
+    if (!options.providerName) throw new Error("native search requires the routed provider identity");
+    const cfg = config.webSearchSidecar ?? {};
+    const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const routedModelStallTimeoutMs = resolveRoutedModelStallTimeoutMs(cfg.routedModelStallTimeoutMs);
+    return {
+      backend: "mistral",
+      mistralSidecar: { providerName: options.providerName, provider, config },
+      hostedTool: parsed._webSearch,
+      settings: { model: provider.helpers!.searchModel!, reasoning: "low", timeoutMs,
+        describeImages: requiresVisionPreprocessing(config, provider, modelId, options.providerName) },
+      maxSearches: cfg.maxSearchesPerTurn ?? DEFAULT_MAX_SEARCHES,
+      routedModelStallTimeoutMs,
+      stallTimeoutSec: webSearchStallTimeoutSec(config.stallTimeoutSec, config.connectTimeoutMs ?? 200_000, routedModelStallTimeoutMs, timeoutMs),
+      streamRoutedModelOutput: cfg.streamRoutedModelOutput === true,
+    };
+  }
   const cfg = config.webSearchSidecar ?? {};
   if (cfg.enabled === false) return undefined;
   const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;

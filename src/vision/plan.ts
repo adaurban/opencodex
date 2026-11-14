@@ -1,3 +1,4 @@
+import { providerVisionConfig } from "../sidecar/provider-policy";
 import type { OcxConfig, OcxContentPart, OcxParsedRequest, OcxProviderConfig } from "../types";
 import { modelRecordValue, type VisionReasoningEffort } from "../reasoning-effort";
 import type { VisionSettings } from "./describe";
@@ -178,6 +179,8 @@ export function shouldResolveOpenAiVisionSidecar(
   parsed: OcxParsedRequest,
   providerName?: string,
 ): boolean {
+  config = providerVisionConfig(config, provider, providerName);
+  if (provider.helpers?.vision === "native") return false;
   if (!requiresVisionPreprocessing(config, provider, modelId, providerName) || !messagesHaveImage(parsed)) return false;
   const cfg = config.visionSidecar ?? {};
   if (cfg.enabled === false) return false;
@@ -219,6 +222,7 @@ export function planVisionSidecar(
     advisorAdmissionPolicy?: CapturedAdmissionPolicy;
   } = {},
 ): VisionPlan | undefined {
+  config = providerVisionConfig(config, provider, options.providerName);
   if (!requiresVisionPreprocessing(config, provider, modelId, options.providerName)) return undefined;
   if (!messagesHaveImage(parsed)) return undefined;
   const cfg = config.visionSidecar ?? {};
@@ -254,6 +258,7 @@ export function planVisionSidecar(
       maxDescriptionsPerTurn: resolveMaxDescriptionsPerTurn(cfg.maxDescriptionsPerTurn),
     };
   }
+  if (provider.helpers?.vision === "native") throw new Error("native vision model cannot accept images");
   // A non-dispatchable routed configuration keeps the legacy backend fallback below.
 
   const backend = preferredVisionBackend(config, options.providerName);

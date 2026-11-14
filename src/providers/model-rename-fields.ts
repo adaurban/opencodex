@@ -132,6 +132,7 @@ export const PROVIDER_MODEL_RENAME_ROLES = {
   parallelToolCalls: "none",
   pinParallelToolCallsFalse: "none",
   terminalContinuationGuard: "none",
+  helpers: "none", // Bare same-provider helper slugs, not routed model references.
   openaiChatEofTolerance: "none",
   foldDeveloperRoleToSystem: "none",
   singleLeadingSystemMessage: "none",

@@ -40,6 +40,7 @@ export interface ProviderSettingsDraft {
   note: string;
   allowPrivateNetwork: boolean;
   preserveReasoningReplay: boolean;
+  helpers: NonNullable<WorkspaceItem["helpers"]>;
   liveModels: boolean;
   cursorHttpVersion: "http2" | "http1.1";
   pacingEnabled: boolean;
@@ -161,6 +162,7 @@ export function providerSettingsDraftFromItem(item: WorkspaceItem): ProviderSett
     note: item.note ?? "",
     allowPrivateNetwork: item.allowPrivateNetwork ?? false,
     preserveReasoningReplay: item.preserveResponsesReasoningContent === true,
+    helpers: { ...item.helpers },
     liveModels: liveModelDiscoverySupported ? item.liveModels !== false : false,
     cursorHttpVersion: effectiveCursorHttpVersion(item.upstreamHttpVersion),
     pacingEnabled: item.requestPacing?.enabled === true,
@@ -298,6 +300,7 @@ export function providerSettingsFieldsDirty(draft: ProviderSettingsDraft, saved:
   const supportsReasoningReplay = !isCatalogProviderId(saved.name)
     && canConfigureResponsesReasoningReplay({ adapter, baseUrl: draft.baseUrl, authMode: draft.authMode });
   return (supportsReasoningReplay && draft.preserveReasoningReplay !== (saved.preserveResponsesReasoningContent === true))
+    || providerSettingsValueSignature(draft.helpers) !== providerSettingsValueSignature(saved.helpers ?? {})
     || adapter !== saved.adapter
     || draft.baseUrl.trim() !== saved.baseUrl
     || (vertexSettings && (draft.project.trim() !== (saved.project ?? "") || draft.location.trim() !== (saved.location ?? "")))
@@ -331,6 +334,7 @@ export function providerSettingsDeltaPatch(
   nextBaseUrl: string,
 ): { patch: ProviderUpdatePatch; fieldsDirty: boolean; pacingDirty: boolean } {
   const patch: ProviderUpdatePatch = {};
+  if (providerSettingsValueSignature(draft.helpers) !== providerSettingsValueSignature(baseline.helpers)) patch.helpers = { ...draft.helpers };
   const adapter = draft.adapter.trim();
   const baselineAdapter = baseline.adapter.trim();
   const vertexSettings = isVertexProvider(saved) && (saved.name === "google-vertex" || adapter === "google");
@@ -390,6 +394,7 @@ export function rebaseProviderSettingsDraft(
     note: pick("note"),
     allowPrivateNetwork: pick("allowPrivateNetwork"),
     preserveReasoningReplay: pick("preserveReasoningReplay"),
+    helpers: { ...pick("helpers") },
     liveModels: pick("liveModels"),
     cursorHttpVersion: pick("cursorHttpVersion"),
     pacingEnabled: pick("pacingEnabled"),

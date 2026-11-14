@@ -1,3 +1,4 @@
+import { runMistralWebSearch } from "./mistral-executor";
 // LOCAL PATCH (runturn-websearch): web-search sidecar loop for runTurn adapters.
 //
 // Upstream's runWithWebSearch (loop.ts) only drives the buildRequest/fetch/
@@ -281,6 +282,10 @@ export async function* runTurnWebSearchLoop(
           return plan.geminiSidecar
             ? await runGeminiWebSearch(query, plan.geminiSidecar.providerName, plan.geminiSidecar.provider, plan.settings, signal)
             : { text: "", sources: [], error: "gemini backend selected without a resolved Antigravity provider" };
+        case "mistral":
+          return plan.mistralSidecar
+            ? await runMistralWebSearch(query, plan.mistralSidecar, plan.settings, signal, deps.dispatchSidecarSend)
+            : { text: "", sources: [], error: "native Mistral search provider is unavailable" };
         case "exa":
           return deps.exaApiKey
             ? await runExaWebSearch(query, deps.exaApiKey, plan.settings, signal)

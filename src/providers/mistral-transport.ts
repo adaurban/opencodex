@@ -1,3 +1,5 @@
+import { isCanonicalMistralChat } from "./mistral-destination";
+export { isCanonicalMistralChat } from "./mistral-destination";
 import { createHash } from "node:crypto";
 import type { OcxProviderConfig } from "../types";
 import { isEgressTransparentExecutor, markEgressTransparentExecutor } from "../lib/provider-egress";
@@ -20,18 +22,6 @@ const MAX_WAITERS_TOTAL = 4 * MAX_WAITERS_PER_IDENTITY;
 const DEFAULT_MAX_WAIT_MS = 60_000; // Existing retry wait budget, not an inferred rate window.
 const MINUTE_MS = 60 * 1000; // Unit named by the observed headers, never an account quota.
 type RecoveryState = { generation: number; probe?: { done: Promise<void>; finish(): void } };
-
-/** Match the supported key-auth Chat destination, including one optional trailing slash. */
-export function isCanonicalMistralChat(
-  provider: Pick<OcxProviderConfig, "adapter" | "authMode" | "baseUrl">,
-): boolean {
-  if (provider.adapter !== "openai-chat" || (provider.authMode !== undefined && provider.authMode !== "key")) return false;
-  try {
-    const url = new URL(provider.baseUrl);
-    return url.origin === "https://api.mistral.ai" && /^\/v1\/?$/.test(url.pathname)
-      && !url.username && !url.password && !url.search && !url.hash;
-  } catch { return false; }
-}
 
 /** Read a nonnegative integer counter; reject missing or malformed values. */
 function count(headers: Headers, name: string): number | undefined {

@@ -17,6 +17,14 @@ import type { TKey } from "./en";
  * Japanese i18n catalog; must match the `TKey` set (compile-checked).
  */
 export const ja: Record<TKey, string> = {
+  "pws.helpers.description": "Provider helpers are saved with this provider. Native mode uses Mistral only; an unavailable helper never falls back to GPT.",
+  "pws.helpers.search": "Web search helper",
+  "pws.helpers.vision": "Image helper",
+  "pws.helpers.inherit": "Use global setting",
+  "pws.helpers.native": "Use Mistral",
+  "pws.helpers.disabled": "Disabled",
+  "pws.helpers.searchModel": "Mistral search model",
+  "pws.helpers.visionModel": "Mistral image model",
     "pws.firstResponse.title": "初回応答の進行状況",
   "pws.firstResponse.stepProvider": "プロバイダー",
   "pws.firstResponse.stepModels": "モデル",

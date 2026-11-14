@@ -1,3 +1,4 @@
+import { providerHelpersConfigError } from "../sidecar/provider-policy";
 import { providerRelativeSendPathConfigError } from "../config/provider-relative-send-path";
 import { contextTierRecordConfigError, modelCapabilitiesConfigError, providerInputModalitiesConfigError } from "../config/provider-validation";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -1002,6 +1003,8 @@ export function providerManagementConfigError(
   if (requestPacingError) {
     return `provider ${JSON.stringify(redactSecretString(name))} ${requestPacingError}`;
   }
+  const helperError = providerHelpersConfigError(raw.helpers, typed);
+  if (helperError) return helperError;
   const webSearchBridgeError = providerWebSearchBridgeConfigError(raw.webSearchBridge, name, typed);
   if (webSearchBridgeError) {
     return `provider ${JSON.stringify(redactSecretString(name))} ${webSearchBridgeError}`;
@@ -1306,6 +1309,7 @@ const PROVIDER_CONFIG_FIELD_POLICY = {
   parallelToolCalls: "editor",
   pinParallelToolCallsFalse: "editor",
   terminalContinuationGuard: "editor",
+  helpers: "editor",
   openaiChatEofTolerance: "editor",
   foldDeveloperRoleToSystem: "editor",
   singleLeadingSystemMessage: "editor",

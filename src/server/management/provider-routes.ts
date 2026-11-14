@@ -1,3 +1,4 @@
+import { providerHelpersConfigError } from "../../sidecar/provider-policy";
 import { contextTierRecordConfigError, modelCapabilitiesConfigError, mergeModelCapabilities } from "../../config/provider-validation";
 import { DECLARABLE_HOSTED_TOOL_TYPES } from "../../responses/hosted-tool-policy";
 import { randomUUID } from "node:crypto";
@@ -476,6 +477,15 @@ function applyProviderPatchFields(
     next.xaiResponsesDefaultVersion = Math.max(next.xaiResponsesDefaultVersion ?? 0, XAI_RESPONSES_DEFAULT_VERSION);
     touched = true;
   }
+  if (Object.hasOwn(rawBody, "helpers")) {
+    if (rawBody.helpers === null) delete next.helpers;
+    else {
+      const error = providerHelpersConfigError(rawBody.helpers, next);
+      if (error) return { error };
+      next.helpers = structuredClone(rawBody.helpers) as OcxProviderConfig["helpers"];
+    }
+    touched = true;
+  }
   if (Object.hasOwn(rawBody, "requestPacing")) {
     const value = rawBody.requestPacing;
     if (value === null) {
@@ -899,6 +909,7 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
       hasHeaders: !!p.headers && Object.keys(p.headers).length > 0,
       allowPrivateNetwork: p.allowPrivateNetwork === true,
       preserveResponsesReasoningContent: p.preserveResponsesReasoningContent,
+      helpers: p.helpers,
       promoteAdditionalTools: p.promoteAdditionalTools,
       forwardAdvisorTool: p.forwardAdvisorTool,
       liveModels: p.liveModels !== false,

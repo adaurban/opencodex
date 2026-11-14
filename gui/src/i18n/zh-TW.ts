@@ -15,6 +15,14 @@ import type { TKey } from "./en";
 
 /** Traditional Chinese (Taiwan) UI strings — keys must match `en.ts` 1:1. */
 export const zhTW: Record<TKey, string> = {
+  "pws.helpers.description": "Provider helpers are saved with this provider. Native mode uses Mistral only; an unavailable helper never falls back to GPT.",
+  "pws.helpers.search": "Web search helper",
+  "pws.helpers.vision": "Image helper",
+  "pws.helpers.inherit": "Use global setting",
+  "pws.helpers.native": "Use Mistral",
+  "pws.helpers.disabled": "Disabled",
+  "pws.helpers.searchModel": "Mistral search model",
+  "pws.helpers.visionModel": "Mistral image model",
     "pws.firstResponse.title": "首次回應進度",
   "pws.firstResponse.stepProvider": "供應商",
   "pws.firstResponse.stepModels": "模型",

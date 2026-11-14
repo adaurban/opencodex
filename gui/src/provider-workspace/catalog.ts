@@ -33,6 +33,7 @@ import type { ProviderDiscoverySummary } from "../models-groups";
  */
 export interface WorkspaceProvider {
   anthropicOAuthInstance?: "anthropic2";
+  helpers?: import("../../../src/types/provider-helpers").ProviderHelpers;
   adapter: string;
   baseUrl: string;
   hasApiKey?: boolean;

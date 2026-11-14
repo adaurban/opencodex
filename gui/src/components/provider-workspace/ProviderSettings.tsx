@@ -1,3 +1,4 @@
+import { isCanonicalMistralChat } from "../../../../src/providers/mistral-destination";
 /**
  * ProviderSettings — adapter/baseUrl/defaultModel/authMode/note editing form
  * for the workspace Settings tab (WP091). Uses PATCH /api/providers via an
@@ -131,6 +132,7 @@ function ProviderSettingsForm({
   const [apiKeyTransport, setApiKeyTransport] = useState(initial.draft.apiKeyTransport);
   const [note, setNote] = useState(initial.draft.note);
   const [allowPrivateNetwork, setAllowPrivateNetwork] = useState(initial.draft.allowPrivateNetwork);
+  const [helpers, setHelpers] = useState(initial.draft.helpers);
   const [preserveReasoningReplay, setPreserveReasoningReplay] = useState(initial.draft.preserveReasoningReplay);
   const [liveModels, setLiveModels] = useState(initial.draft.liveModels);
   const [cursorHttpVersion, setCursorHttpVersion] = useState<CursorHttpVersion>(initial.draft.cursorHttpVersion);
@@ -178,11 +180,11 @@ function ProviderSettingsForm({
 
   const draft = useMemo<ProviderSettingsDraft>(() => ({
     adapter, baseUrl, project, location, defaultModel, authMode, apiKeyTransport, note,
-    allowPrivateNetwork, preserveReasoningReplay, liveModels, cursorHttpVersion,
+    allowPrivateNetwork, preserveReasoningReplay, helpers, liveModels, cursorHttpVersion,
     pacingEnabled, keyPacing, pacingRpm, pacingDelay, pacingConcurrency, pacingModels,
   }), [adapter, allowPrivateNetwork, apiKeyTransport, authMode, baseUrl, cursorHttpVersion, defaultModel,
     keyPacing, liveModels, location, note, pacingConcurrency, pacingDelay, pacingEnabled, pacingModels, pacingRpm,
-    preserveReasoningReplay, project]);
+    preserveReasoningReplay, helpers, project]);
 
   const applyDraft = (next: ProviderSettingsDraft) => {
     setAdapter(next.adapter);
@@ -195,6 +197,7 @@ function ProviderSettingsForm({
     setNote(next.note);
     setAllowPrivateNetwork(next.allowPrivateNetwork);
     setPreserveReasoningReplay(next.preserveReasoningReplay);
+    setHelpers({ ...next.helpers });
     setLiveModels(next.liveModels);
     setCursorHttpVersion(next.cursorHttpVersion);
     setPacingEnabled(next.pacingEnabled);
@@ -529,6 +532,28 @@ function ProviderSettingsForm({
             options={adapterOptions.map(a => ({ value: a, label: a }))} />
         )}
       </label>
+      {isCanonicalMistralChat({ adapter: item.adapter, baseUrl: item.baseUrl, authMode: item.authMode as "key" }) && (
+        <>
+          <p className="text-muted">{t("pws.helpers.description")}</p>
+          {(["search", "vision"] as const).map(kind => (
+            <div key={kind} className="pwi-settings-field">
+              <Select fullWidth label={t(kind === "search" ? "pws.helpers.search" : "pws.helpers.vision")}
+                value={helpers[kind] ?? "inherit"}
+                onChange={value => setHelpers(previous => ({ ...previous, [kind]: value }))}
+                options={[
+                  { value: "inherit", label: t("pws.helpers.inherit") },
+                  { value: "native", label: t("pws.helpers.native") },
+                  { value: "disabled", label: t("pws.helpers.disabled") },
+                ]} />
+              {helpers[kind] === "native" && <label className="pwi-settings-field">
+                <span className="pwi-settings-label">{t(kind === "search" ? "pws.helpers.searchModel" : "pws.helpers.visionModel")}</span>
+                <input className="input" value={helpers[kind === "search" ? "searchModel" : "visionModel"] ?? ""}
+                  onChange={event => setHelpers(previous => ({ ...previous, [kind === "search" ? "searchModel" : "visionModel"]: event.target.value }))} />
+              </label>}
+            </div>
+          ))}
+        </>
+      )}
       <ProviderProtocolPanel
         apiBase={apiBase}
         providerName={item.name}

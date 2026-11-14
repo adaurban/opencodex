@@ -18,6 +18,14 @@ import type { TKey } from "./en";
  * German i18n catalog, generated from en.ts. Must match the `TKey` set (compile-checked).
  */
 export const de: Record<TKey, string> = {
+  "pws.helpers.description": "Provider helpers are saved with this provider. Native mode uses Mistral only; an unavailable helper never falls back to GPT.",
+  "pws.helpers.search": "Web search helper",
+  "pws.helpers.vision": "Image helper",
+  "pws.helpers.inherit": "Use global setting",
+  "pws.helpers.native": "Use Mistral",
+  "pws.helpers.disabled": "Disabled",
+  "pws.helpers.searchModel": "Mistral search model",
+  "pws.helpers.visionModel": "Mistral image model",
     "pws.firstResponse.title": "Fortschritt bis zur ersten Antwort",
   "pws.firstResponse.stepProvider": "Anbieter",
   "pws.firstResponse.stepModels": "Modelle",

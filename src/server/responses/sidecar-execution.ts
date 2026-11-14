@@ -726,6 +726,7 @@ export async function executeResponsesSidecars(
       anthropicSidecar: wsPlan.anthropicSidecar,
       xaiSidecar: wsPlan.xaiSidecar,
       geminiSidecar: wsPlan.geminiSidecar,
+      mistralSidecar: wsPlan.mistralSidecar,
       xaiSearchOptions: wsPlan.xaiSearchOptions,
       // The exa key never rides the plan: read it from config at unpack time (L9).
       ...(wsPlan.exaConfigured ? { exaApiKey: config.webSearchSidecar?.exaApiKey } : {}),
