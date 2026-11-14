@@ -49,3 +49,5 @@ The hosted tool loops in `src/web-search/loop.ts`, `src/web-search/run-turn-loop
 commentary path retains these events for the next iteration.
 Intercepted search and image iterations emit their validated signed progress before fulfilling
 the hosted calls, retaining the same blocks for replay and avoiding duplicate live updates. Unfinished calls never become executable search/media/advisor continuations; search history rejects an explicitly incomplete tool end.
+
+Mistral helper citation parsing follows the [provider-owned search contract](../data-planes/search.md#provider-owned-mistral-helpers): executed searches accept structured references or explicit Markdown links under shared source budgets; Anthropic progress handling is unchanged.

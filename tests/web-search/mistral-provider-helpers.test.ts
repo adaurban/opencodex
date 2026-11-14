@@ -70,6 +70,23 @@ test("mapper preserves citations and rejects memory-only, uncited and empty answ
   unsafe.outputs[1]!.content!.pop(); expect(mapMistralSearchResponse(unsafe).error).toContain("no web citations");
 });
 
+test("live-shaped string answers retain bounded Markdown sources after executed search", () => {
+  const answer = { outputs: [{ type: "tool.execution", name: "web_search" }, {
+    type: "message.output", role: "assistant", content: "Latest stable: [GitHub release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4)\n"
+      + "[Duplicate](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4)\n"
+      + "[Credentials](https://user:password@example.com/) ![Image](https://example.com/image.png)",
+  }] };
+  expect(mapMistralSearchResponse(answer).sources).toEqual([
+    { url: "https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4", title: "GitHub release" },
+  ]);
+  const many = { outputs: [{ type: "tool.execution", name: "web_search" }, {
+    type: "message.output", role: "assistant", content: Array.from({ length: 30 }, (_, i) => `[Source](https://example.com/${i})`).join("\n"),
+  }] };
+  expect(mapMistralSearchResponse(many).sources).toHaveLength(20);
+  answer.outputs.shift();
+  expect(mapMistralSearchResponse(answer).error).toContain("did not execute");
+});
+
 test("executor sends only the query with the selected Mistral key, no history or GPT headers", async () => {
   const calls: Array<{ url: string; init?: RequestInit }> = [];
   globalThis.fetch = (async (url, init) => { calls.push({ url: String(url), init }); return Response.json(payload()); }) as typeof fetch;

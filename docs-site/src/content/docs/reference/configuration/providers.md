@@ -1974,3 +1974,5 @@ The optional `providers.<name>.helpers` object selects helpers for that provider
 ```
 
 Model names above are examples, not account entitlement guarantees. Choose available models and verify access before enabling them. Both names are bare model IDs from the same provider. Native search sends the query to `/v1/conversations` with `web_search` and `store: false`; the primary model continues using Chat Completions. Search must return evidence of tool execution, assistant text and HTTP citations; missing evidence or HTTP failures become failed search results. No search engine vendor is assumed. Responses API migration is not required. Image-capable main models still receive images directly; text-only main models use the existing routed image describer with the selected same-provider model. Captioning can lose detail. A missing or unusable native describer fails rather than borrowing a GPT helper.
+
+Native Mistral search accepts structured citations and explicit Markdown source links from executed searches. Links are bounded and checked for safe URL syntax; their presence does not independently verify the answer or the cited page.

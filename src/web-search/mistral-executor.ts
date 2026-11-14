@@ -10,6 +10,7 @@ import { cancelBodyOnAbort, signalWithTimeout } from "../lib/abort";
 import { readBoundedResponseBytes } from "../lib/bounded-body";
 import { sidecarEnter } from "../lib/sidecar-tracker";
 import { MAX_SIDECAR_RESPONSE_BYTES } from "./parse";
+import { appendSafeWebSearchSource } from "./sources";
 import type { SidecarOutcome, SidecarSettings } from "./executor";
 
 const failure = (error: string): SidecarOutcome => ({ text: "", sources: [], error });
@@ -22,7 +23,6 @@ export function mapMistralSearchResponse(payload: unknown): SidecarOutcome {
   if (!rec(payload) || !Array.isArray(payload.outputs)) return failure("Mistral search returned an invalid body");
   const text: string[] = [];
   const sources: SidecarOutcome["sources"] = [];
-  const seen = new Set<string>();
   let executed = false;
   for (const entry of payload.outputs) {
     if (!rec(entry)) continue;
@@ -34,16 +34,20 @@ export function mapMistralSearchResponse(payload: unknown): SidecarOutcome {
       if (!rec(chunk)) continue;
       if (chunk.type === "text" && typeof chunk.text === "string") text.push(chunk.text);
       if (chunk.type !== "tool_reference" || chunk.tool !== "web_search" || typeof chunk.url !== "string") continue;
-      try {
-        const url = new URL(chunk.url);
-        if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || seen.has(url.href)) continue;
-        seen.add(url.href);
-        sources.push({ url: url.href, ...(typeof chunk.title === "string" ? { title: chunk.title } : {}) });
-      } catch { /* Non-URL references cannot become web citations. */ }
+      appendSafeWebSearchSource(sources, { url: chunk.url, title: chunk.title });
     }
   }
   if (!executed) return failure("Mistral did not execute web_search");
   if (!text.join("").trim()) return failure("Mistral search returned no answer");
+  // Live Conversations replies can use string content with Markdown citations instead of chunks.
+  // Prefer structured references; a text link is supporting evidence, not verified provenance.
+  if (!sources.length) {
+    for (const part of text) {
+      for (const match of part.matchAll(/(?<!!)\[([^\]\r\n]{1,256})\]\((https?:\/\/[^\s<>()]+)\)/gu)) {
+        appendSafeWebSearchSource(sources, { url: match[2], title: match[1] });
+      }
+    }
+  }
   if (!sources.length) return failure("Mistral search returned no web citations");
   return { text: text.join("\n"), sources };
 }
